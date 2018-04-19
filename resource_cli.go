@@ -66,8 +66,7 @@ func resourceServer() *schema.Resource {
                 Default:  true,
 			},
 
-			// This will be run if we are updating the state.  If not set, then we will assume 
-			// destroy then create
+			// This will be run if we are updating the state.
 			"update_cmd": &schema.Schema{
 				Type:     schema.TypeString,
                 Optional: true,
