@@ -6,7 +6,7 @@ Terraform provider plugin to replace null\_resource local\_exec.
 Usage
 -------------------------
 
-```
+```hcl
 provider "cli" {
   // Shell to run (defaults to "sh"
   shell = "bash"
