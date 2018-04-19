@@ -17,6 +17,10 @@ resource "cli" "example" {
     key = "value"
   }
 
+  // If specified, this will set the default directory to run the commands in
+  // (default: current pwd)
+  working_dir = "/tmp"
+
   // If specified, this command will be run on creation
   create_cmd = "echo \"Create$(pwd)\"; echo CreateBye 1>&2; exit 1"
 

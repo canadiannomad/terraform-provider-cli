@@ -25,6 +25,12 @@ func resourceServer() *schema.Resource {
 				Optional: true,
 			},
 
+            // Directory to run the commands in
+			"working_dir": &schema.Schema{
+				Type:     schema.TypeString,
+                Optional: true,
+				Required: false,
+			},
             // This will be run on creation
 			"create_cmd": &schema.Schema{
 				Type:     schema.TypeString,
@@ -137,9 +143,10 @@ func createAction(d *schema.ResourceData, m interface{}) error {
 
     if cmdv, ok := d.GetOk("create_cmd"); ok {
         cmd := cmdv.(string)
+        working_dir := d.Get("working_dir").(string)
         trim_output := d.Get("trim_output").(bool)
         create_break_on_error := d.Get("create_break_on_error").(bool)
-        stdout, stderr, retval = run(config.Shell, cmd)
+        stdout, stderr, retval = run(config.Shell, working_dir, cmd)
         if (create_break_on_error && retval != 0) {
             return fmt.Errorf("'%s' returned a non-zero exit code.", cmd)
         }
@@ -169,10 +176,11 @@ func readAction(d *schema.ResourceData, m interface{}) error {
 
     if cmdv, ok := d.GetOk("read_cmd"); ok {
         cmd := cmdv.(string)
+        working_dir := d.Get("working_dir").(string)
         trim_output := d.Get("trim_output").(bool)
         read_destroyed_on_error := d.Get("read_destroyed_on_error").(bool)
         read_break_on_error := d.Get("read_break_on_error").(bool)
-        stdout, stderr, retval = run(config.Shell, cmd)
+        stdout, stderr, retval = run(config.Shell, working_dir, cmd)
         if (read_destroyed_on_error && retval != 0) {
             d.SetId("")
             return nil
@@ -211,9 +219,10 @@ func updateAction(d *schema.ResourceData, m interface{}) error {
 
     if cmdv, ok := d.GetOk("update_cmd"); ok {
         cmd := cmdv.(string)
+        working_dir := d.Get("working_dir").(string)
         trim_output := d.Get("trim_output").(bool)
         update_break_on_error := d.Get("update_break_on_error").(bool)
-        stdout, stderr, retval = run(config.Shell, cmd)
+        stdout, stderr, retval = run(config.Shell, working_dir, cmd)
         if (update_break_on_error && retval != 0) {
             return fmt.Errorf("'%s' returned a non-zero exit code.", cmd)
         }
@@ -238,8 +247,9 @@ func deleteAction(d *schema.ResourceData, m interface{}) error {
 
     if cmdv, ok := d.GetOk("delete_cmd"); ok {
         cmd := cmdv.(string)
+        working_dir := d.Get("working_dir").(string)
         delete_break_on_error := d.Get("delete_break_on_error").(bool)
-        _, _, retval := run(config.Shell, cmd)
+        _, _, retval := run(config.Shell, working_dir, cmd)
         if (delete_break_on_error && retval != 0) {
             return fmt.Errorf("'%s' returned a non-zero exit code.", cmd)
         }
@@ -249,13 +259,17 @@ func deleteAction(d *schema.ResourceData, m interface{}) error {
 	return nil
 }
 
-func run(shell string, str string) (string, string, int) {
+func run(shell string, working_dir string, str string) (string, string, int) {
     var stdout_buf bytes.Buffer
     var stderr_buf bytes.Buffer
 
     cmd := exec.Command(shell, "-c", str)
     cmd.Stdout = &stdout_buf
     cmd.Stderr = &stderr_buf
+
+    if (working_dir != "") {
+        cmd.Dir = working_dir
+    }
     retval := 0
 
 
