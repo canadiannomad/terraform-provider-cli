@@ -72,6 +72,15 @@ func resourceServer() *schema.Resource {
                 Default:  true,
 			},
 
+            // If this is set to true then the output of create and update will be the result of
+            // the execution of the read command
+			"read_on_create_update": &schema.Schema{
+				Type:     schema.TypeBool,
+                Optional: true,
+				Required: false,
+                Default:  false,
+			},
+
 			// This will be run if we are updating the state.
 			"update_cmd": &schema.Schema{
 				Type:     schema.TypeString,
@@ -110,11 +119,21 @@ func resourceServer() *schema.Resource {
                 Default:  false,
 			},
 
-            // Will get set to true by read if changed
-			"updated": &schema.Schema{
-				Type:     schema.TypeBool,
+            // Will set to the latest output of the commands
+			"last_read_stdout": &schema.Schema{
+				Type:     schema.TypeString,
                 Optional: true,
-                Default:  false,
+                //DiffSuppressFunc: lastReadDiffFunc,
+			},
+			"last_read_stderr": &schema.Schema{
+				Type:     schema.TypeString,
+                Optional: true,
+                //DiffSuppressFunc: lastReadDiffFunc,
+			},
+			"last_read_retval": &schema.Schema{
+				Type:     schema.TypeInt,
+                Optional: true,
+                //DiffSuppressFunc: lastReadDiffFunc,
 			},
 
 			// Our return values
@@ -134,19 +153,27 @@ func resourceServer() *schema.Resource {
 	}
 }
 
+func lastReadDiffFunc (k, oldVal, newVal string, d *schema.ResourceData) bool {
+    if (len(oldVal) > 0 && len(newVal) == 0) {
+        return true
+    } else {
+        return false
+    }
+}
+
 func createAction(d *schema.ResourceData, m interface{}) error {
     config := m.(*Config)
-    stdout := ""
-    stderr := ""
-    retval := 0
 
+    log.Printf("cli Creating")
+
+    d.SetId(fmt.Sprintf("%d", rand.Int()))
 
     if cmdv, ok := d.GetOk("create_cmd"); ok {
         cmd := cmdv.(string)
         working_dir := d.Get("working_dir").(string)
         trim_output := d.Get("trim_output").(bool)
         create_break_on_error := d.Get("create_break_on_error").(bool)
-        stdout, stderr, retval = run(config.Shell, working_dir, cmd)
+        stdout, stderr, retval := run(config.Shell, working_dir, cmd)
         if (create_break_on_error && retval != 0) {
             return fmt.Errorf("'%s' returned a non-zero exit code.", cmd)
         }
@@ -155,24 +182,30 @@ func createAction(d *schema.ResourceData, m interface{}) error {
             stderr = strings.TrimSpace(stderr)
         }
 
+        d.Set("stdout", stdout)
+        d.Set("stderr", stderr)
+        d.Set("retval", retval)
+
+        if (d.Get("read_on_create_update").(bool)) {
+            return readAction(d, m)
+        }
+
+        return nil
+
     }
 
-    d.SetId(fmt.Sprintf("%d", rand.Int()))
+    if (d.Get("read_on_create_update").(bool)) {
+        return readAction(d, m)
+    }
 
-    d.Set("updated", false)
-    d.Set("stdout", stdout)
-    d.Set("stderr", stderr)
-    d.Set("retval", retval)
 
 	return nil
 }
 
 func readAction(d *schema.ResourceData, m interface{}) error {
     config := m.(*Config)
-    stdout := ""
-    stderr := ""
-    retval := 0
 
+    log.Printf("cli Reading")
 
     if cmdv, ok := d.GetOk("read_cmd"); ok {
         cmd := cmdv.(string)
@@ -180,7 +213,7 @@ func readAction(d *schema.ResourceData, m interface{}) error {
         trim_output := d.Get("trim_output").(bool)
         read_destroyed_on_error := d.Get("read_destroyed_on_error").(bool)
         read_break_on_error := d.Get("read_break_on_error").(bool)
-        stdout, stderr, retval = run(config.Shell, working_dir, cmd)
+        stdout, stderr, retval := run(config.Shell, working_dir, cmd)
         if (read_destroyed_on_error && retval != 0) {
             d.SetId("")
             return nil
@@ -193,36 +226,27 @@ func readAction(d *schema.ResourceData, m interface{}) error {
             stdout = strings.TrimSpace(stdout)
             stderr = strings.TrimSpace(stderr)
         }
-
-        old_stdout := d.Get("stdout").(string)
-        old_stderr := d.Get("stderr").(string)
-        old_retval := d.Get("retval").(int)
-        if(old_stdout != stdout || old_stderr != stderr || old_retval != retval) {
-            d.Set("updated", true)
-        }
+        d.SetId(d.Id())
+        d.Set("last_read_stdout", stdout)
+        d.Set("last_read_stderr", stderr)
+        d.Set("last_read_retval", retval)
 
     }
-
-    d.Set("stdout", stdout)
-    d.Set("stderr", stderr)
-    d.Set("retval", retval)
 
 	return nil
 }
 
 func updateAction(d *schema.ResourceData, m interface{}) error {
     config := m.(*Config)
-    stdout := ""
-    stderr := ""
-    retval := 0
 
+    log.Printf("cli Updating")
 
     if cmdv, ok := d.GetOk("update_cmd"); ok {
         cmd := cmdv.(string)
         working_dir := d.Get("working_dir").(string)
         trim_output := d.Get("trim_output").(bool)
         update_break_on_error := d.Get("update_break_on_error").(bool)
-        stdout, stderr, retval = run(config.Shell, working_dir, cmd)
+        stdout, stderr, retval := run(config.Shell, working_dir, cmd)
         if (update_break_on_error && retval != 0) {
             return fmt.Errorf("'%s' returned a non-zero exit code.", cmd)
         }
@@ -231,12 +255,21 @@ func updateAction(d *schema.ResourceData, m interface{}) error {
             stderr = strings.TrimSpace(stderr)
         }
 
+        d.Set("stdout", stdout)
+        d.Set("stderr", stderr)
+        d.Set("retval", retval)
+
+        if (d.Get("read_on_create_update").(bool)) {
+            return readAction(d, m)
+        }
+
+        return nil
+
     }
 
-    d.Set("updated", false)
-    d.Set("stdout", stdout)
-    d.Set("stderr", stderr)
-    d.Set("retval", retval)
+    if (d.Get("read_on_create_update").(bool)) {
+        return readAction(d, m)
+    }
 
 	return nil
 }
@@ -244,6 +277,7 @@ func updateAction(d *schema.ResourceData, m interface{}) error {
 func deleteAction(d *schema.ResourceData, m interface{}) error {
     config := m.(*Config)
 
+    log.Printf("cli Deleting")
 
     if cmdv, ok := d.GetOk("delete_cmd"); ok {
         cmd := cmdv.(string)

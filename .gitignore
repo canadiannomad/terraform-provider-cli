@@ -1,3 +1,7 @@
-build.sh
 terraform-provider-cli
-test/**
+test/terraform
+test/terraform.tfstate*
+test/.terraform
+*.log
+log.*
+file.txt
