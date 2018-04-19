@@ -1,7 +1,7 @@
 terraform-provider-cli
 =========================
 
-Terraform provider plugin to replace null\_resource local\_exec.
+Terraform provider plugin to replace `null_resource` `local-exec`.
 
 Usage
 -------------------------
