@@ -47,7 +47,7 @@ Installation
 -------------------------
 
 ```
-go get -u github.com/takebayashi/terraform-provider-dozens
+go get -u github.com/canadiannomad/terraform-provider-cli
 ```
 
 
